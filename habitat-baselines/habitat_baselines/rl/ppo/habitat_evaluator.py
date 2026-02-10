@@ -86,12 +86,20 @@ class HabitatEvaluator(Evaluator):
 
         if len(config.habitat_baselines.eval.video_option) > 0:
             # Add the first frame of the episode to the video.
+            # When rendering a top-down-map, we don't have the info dict yet,
+            # so the first frame would have a different size than subsequent
+            # frames and break video writing.
+            include_start_frame = (
+                "top_down_map" not in config.habitat.task.measurements
+            )
             rgb_frames: List[List[np.ndarray]] = [
                 [
                     observations_to_image(
                         {k: v[env_idx] for k, v in batch.items()}, {}
                     )
                 ]
+                if include_start_frame
+                else []
                 for env_idx in range(config.habitat_baselines.num_environments)
             ]
         else:
@@ -226,6 +234,7 @@ class HabitatEvaluator(Evaluator):
                     frame = observations_to_image(
                         {k: v[i] for k, v in batch.items()}, disp_info
                     )
+                    has_top_down_map = "top_down_map" in disp_info
                     if not not_done_masks[i].any().item():
                         # The last frame corresponds to the first frame of the next episode
                         # but the info is correct. So we use a black frame
@@ -235,8 +244,12 @@ class HabitatEvaluator(Evaluator):
                         )
                         final_frame = overlay_frame(final_frame, disp_info)
                         rgb_frames[i].append(final_frame)
-                        # The starting frame of the next episode will be the final element..
-                        rgb_frames[i].append(frame)
+                        # The starting frame of the next episode will be the final element.
+                        # When rendering a top-down-map, the map size can change across scenes.
+                        # Carrying the next episode's first observation (with stale info) can
+                        # make frame sizes inconsistent and break video writing.
+                        if not has_top_down_map:
+                            rgb_frames[i].append(frame)
                     else:
                         frame = overlay_frame(frame, disp_info)
                         rgb_frames[i].append(frame)
@@ -261,8 +274,10 @@ class HabitatEvaluator(Evaluator):
                         generate_video(
                             video_option=config.habitat_baselines.eval.video_option,
                             video_dir=config.habitat_baselines.video_dir,
+                            images=rgb_frames[i]
+                            if "top_down_map" in disp_info
                             # Since the final frame is the start frame of the next episode.
-                            images=rgb_frames[i][:-1],
+                            else rgb_frames[i][:-1],
                             episode_id=f"{current_episodes_info[i].episode_id}_{ep_eval_count[k]}",
                             checkpoint_idx=checkpoint_index,
                             metrics=extract_scalars_from_info(disp_info),
@@ -271,8 +286,11 @@ class HabitatEvaluator(Evaluator):
                             keys_to_include_in_name=config.habitat_baselines.eval_keys_to_include_in_name,
                         )
 
-                        # Since the starting frame of the next episode is the final frame.
-                        rgb_frames[i] = rgb_frames[i][-1:]
+                        if "top_down_map" in disp_info:
+                            rgb_frames[i] = []
+                        else:
+                            # Since the starting frame of the next episode is the final frame.
+                            rgb_frames[i] = rgb_frames[i][-1:]
 
                     gfx_str = infos[i].get(GfxReplayMeasure.cls_uuid, "")
                     if gfx_str != "":

@@ -119,7 +119,8 @@ def images_to_video(
             instead. Specifying a fixed bitrate using ‘bitrate’ disables
             this parameter.
     """
-    assert 0 <= quality <= 10
+    if quality is not None:
+        assert 0 <= quality <= 10
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     video_name = video_name.replace(" ", "_").replace("\n", "_")
@@ -130,6 +131,40 @@ def images_to_video(
         video_name_split[:-1] + [video_name_split[-1][:251] + ".mp4"]
     )
 
+    # Some visualizations (e.g. top-down-map) can produce frames with different
+    # widths across scenes/episodes. FFMPEG requires a constant frame size, so we
+    # pad all frames to the max (H, W) for this video.
+    heights = [int(im.shape[0]) for im in images]
+    widths = [int(im.shape[1]) for im in images]
+    max_h = max(heights)
+    max_w = max(widths)
+
+    if len(set(zip(heights, widths))) != 1:
+        logger.warning(
+            "Video frames have different sizes %s, padding to (%d, %d).",
+            sorted(set(zip(heights, widths))),
+            max_h,
+            max_w,
+        )
+
+    padded_images: List[np.ndarray] = []
+    for im in images:
+        # Normalize to HxWx3 uint8.
+        if im.ndim == 2:
+            im = np.repeat(im[:, :, None], 3, axis=2)
+        if im.shape[2] == 4:
+            im = im[:, :, :3]
+        if im.dtype != np.uint8:
+            im = im.astype(np.uint8)
+
+        if im.shape[0] == max_h and im.shape[1] == max_w:
+            padded_images.append(im)
+            continue
+
+        padded = np.zeros((max_h, max_w, 3), dtype=im.dtype)
+        padded[: im.shape[0], : im.shape[1]] = im
+        padded_images.append(padded)
+
     writer = imageio.get_writer(
         os.path.join(output_dir, video_name),
         fps=fps,
@@ -138,9 +173,9 @@ def images_to_video(
     )
     logger.info(f"Video created: {os.path.join(output_dir, video_name)}")
     if not verbose:
-        images_iter: List[np.ndarray] = images
+        images_iter: List[np.ndarray] = padded_images
     else:
-        images_iter = tqdm.tqdm(images)  # type: ignore[assignment]
+        images_iter = tqdm.tqdm(padded_images)  # type: ignore[assignment]
     for im in images_iter:
         writer.append_data(im)
     writer.close()
@@ -366,8 +401,19 @@ def overlay_frame(frame, info, additional=None):
     for k, v in flattened_info.items():
         if isinstance(v, str):
             lines.append(f"{k}: {v}")
-        else:
-            lines.append(f"{k}: {v:.2f}")
+            continue
+
+        if isinstance(v, (bool, np.bool_)):
+            lines.append(f"{k}: {v}")
+            continue
+
+        if isinstance(v, np.ndarray):
+            if v.size == 1:
+                lines.append(f"{k}: {float(v.item()):.2f}")
+            continue
+
+        if np.isscalar(v):
+            lines.append(f"{k}: {float(v):.2f}")
     if additional is not None:
         lines.extend(additional)
 
