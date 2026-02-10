@@ -3770,3 +3770,117 @@ Using driver workarounds:
 2026-02-10 17:28:39,152 Average episode spl: 0.9703
 (habitat) liuyi@liuyi:~/projects/habitat-lab$ 
 
+(habitat) liuyi@liuyi:~/projects/habitat-lab$ python -u -m habitat_baselines.run \
+  --config-name=pointnav/ddppo_pointnav_pretrained_tdm.yaml \
+  benchmark/nav/pointnav=pointnav_habitat_test \
+  habitat.dataset.data_path=data/custom_datasets/pointnav/habitat-test-scenes/v1/val_long10.json.gz \
+  habitat_baselines.test_episode_count=10 \
+  habitat_baselines.video_dir=videos/ddppo_pretrained_eval_tdm_long10
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+pybullet build time: Jan 29 2025 23:20:52
+PluginManager::Manager: duplicate static plugin StbImageImporter, ignoring
+PluginManager::Manager: duplicate static plugin GltfImporter, ignoring
+PluginManager::Manager: duplicate static plugin BasisImporter, ignoring
+PluginManager::Manager: duplicate static plugin AssimpImporter, ignoring
+PluginManager::Manager: duplicate static plugin AnySceneImporter, ignoring
+PluginManager::Manager: duplicate static plugin AnyImageImporter, ignoring
+/home/liuyi/miniforge3/envs/habitat/lib/python3.9/site-packages/pygame/pkgdata.py:25: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  from pkg_resources import resource_stream, resource_exists
+2026-02-10 17:43:59,329 Initializing dataset PointNav-v1
+Gym has been unmaintained since 2022 and does not support NumPy 2.0 amongst other critical functionality.
+Please upgrade to Gymnasium, the maintained drop-in replacement of Gym, or contact the authors of your software and request that they upgrade.
+See the migration guide at https://gymnasium.farama.org/introduction/migration_guide/ for additional information.
+pybullet build time: Jan 29 2025 23:20:52
+PluginManager::Manager: duplicate static plugin StbImageImporter, ignoring
+PluginManager::Manager: duplicate static plugin GltfImporter, ignoring
+PluginManager::Manager: duplicate static plugin BasisImporter, ignoring
+PluginManager::Manager: duplicate static plugin AssimpImporter, ignoring
+PluginManager::Manager: duplicate static plugin AnySceneImporter, ignoring
+PluginManager::Manager: duplicate static plugin AnyImageImporter, ignoring
+/home/liuyi/miniforge3/envs/habitat/lib/python3.9/site-packages/pygame/pkgdata.py:25: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  from pkg_resources import resource_stream, resource_exists
+2026-02-10 17:44:01,567 Initializing dataset PointNav-v1
+2026-02-10 17:44:01,568 initializing sim Sim-v0
+PluginManager::Manager: duplicate static plugin StbImageImporter, ignoring
+PluginManager::Manager: duplicate static plugin GltfImporter, ignoring
+PluginManager::Manager: duplicate static plugin BasisImporter, ignoring
+PluginManager::Manager: duplicate static plugin AssimpImporter, ignoring
+PluginManager::Manager: duplicate static plugin AnySceneImporter, ignoring
+PluginManager::Manager: duplicate static plugin AnyImageImporter, ignoring
+Renderer: NVIDIA GeForce RTX 4060 Laptop GPU/PCIe/SSE2 by NVIDIA Corporation
+OpenGL version: 4.6.0 NVIDIA 580.95.05
+Using optional features:
+    GL_ARB_vertex_array_object
+    GL_ARB_separate_shader_objects
+    GL_ARB_robustness
+    GL_ARB_texture_storage
+    GL_ARB_texture_view
+    GL_ARB_framebuffer_no_attachments
+    GL_ARB_invalidate_subdata
+    GL_ARB_texture_storage_multisample
+    GL_ARB_multi_bind
+    GL_ARB_direct_state_access
+    GL_ARB_get_texture_sub_image
+    GL_ARB_texture_filter_anisotropic
+    GL_KHR_debug
+    GL_KHR_parallel_shader_compile
+    GL_NV_depth_buffer_float
+Using driver workarounds:
+    no-forward-compatible-core-context
+    nv-egl-incorrect-gl11-function-pointers
+    no-layout-qualifiers-on-old-glsl
+    nv-zero-context-profile-mask
+    nv-implementation-color-read-format-dsa-broken
+    nv-cubemap-inconsistent-compressed-image-size
+    nv-cubemap-broken-full-compressed-image-query
+    nv-compressed-block-size-in-bits
+[17:44:01:643123]:[Warning]:[Metadata] SceneDatasetAttributes.cpp(107)::addNewSceneInstanceToDataset : Dataset : 'default' : Lighting Layout Attributes 'no_lights' specified in Scene Attributes but does not exist in dataset, so creating default.
+[17:44:01:643252]:[Warning]:[Scene] SemanticScene.h(331)::checkFileExists : ::loadSemanticSceneDescriptor: File `data/scene_datasets/habitat-test-scenes/skokloster-castle.scn` does not exist.  Aborting load.
+[17:44:01:643262]:[Warning]:[Scene] SemanticScene.cpp(123)::loadSemanticSceneDescriptor : SSD File Naming Issue! Neither SemanticAttributes-provided name : `data/scene_datasets/habitat-test-scenes/skokloster-castle.scn` nor constructed filename : `data/scene_datasets/habitat-test-scenes/info_semantic.json` exist on disk.
+[17:44:01:643269]:[Error]:[Scene] SemanticScene.cpp(139)::loadSemanticSceneDescriptor : SSD Load Failure! File with SemanticAttributes-provided name `data/scene_datasets/habitat-test-scenes/skokloster-castle.scn` exists but failed to load.
+[17:44:02:388780]:[Warning]:[Sim] Simulator.cpp(595)::instanceStageForSceneAttributes : The active scene does not contain semantic annotations : activeSemanticSceneID_ = 0
+2026-02-10 17:44:02,390 Initializing task Nav-v0
+/home/liuyi/projects/habitat-lab/habitat-baselines/habitat_baselines/rl/ppo/single_agent_access_mgr.py:205: UserWarning: Environment variable TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD detected, since the`weights_only` argument was not explicitly passed to `torch.load`, forcing weights_only=False.
+  pretrained_state = torch.load(
+2026-02-10 17:44:03,063 Number of params to train: 12454917
+2026-02-10 17:44:03,064 Agent number of parameters: 12454917
+ 10%|████                                    | 1/10 [00:07<01:08,  7.57s/it]2026-02-10 17:44:12,209 Video created: videos/ddppo_pretrained_eval_tdm_long10/episode=12_1-ckpt=0-distance_to_goal=0.16-success=1.00-spl=0.99-distance_to_goal_reward=-0.00.mp4
+                                                                           [2026-02-10 17:44:12,381][imageio_ffmpeg][WARNING] - IMAGEIO FFMPEG_WRITER WARNING: input image is not divisible by macro_block_size=16, resizing from (1455, 512) to (1456, 512) to ensure video compatibility with most codecs and players. To prevent resizing, make your input image divisible by the macro_block_size or set the macro_block_size to 1 (risking incompatibility).
+100%|██████████████████████████████████████| 67/67 [00:00<00:00, 213.59it/s]
+ 20%|████████                                | 2/10 [00:15<01:04,  8.08s/it]2026-02-10 17:44:20,637 Video created: videos/ddppo_pretrained_eval_tdm_long10/episode=36_1-ckpt=0-distance_to_goal=0.01-success=1.00-spl=0.98-distance_to_goal_reward=-0.00.mp4
+                                                                           [2026-02-10 17:44:20,637][imageio_ffmpeg][WARNING] - IMAGEIO FFMPEG_WRITER WARNING: input image is not divisible by macro_block_size=16, resizing from (1455, 512) to (1456, 512) to ensure video compatibility with most codecs and players. To prevent resizing, make your input image divisible by the macro_block_size or set the macro_block_size to 1 (risking incompatibility).
+100%|██████████████████████████████████████| 76/76 [00:00<00:00, 468.73it/s]
+ 30%|████████████                            | 3/10 [00:22<00:51,  7.39s/it]2026-02-10 17:44:27,211 Video created: videos/ddppo_pretrained_eval_tdm_long10/episode=45_1-ckpt=0-distance_to_goal=0.11-success=1.00-spl=0.96-distance_to_goal_reward=-0.00.mp4
+                                                                           [2026-02-10 17:44:27,212][imageio_ffmpeg][WARNING] - IMAGEIO FFMPEG_WRITER WARNING: input image is not divisible by macro_block_size=16, resizing from (1455, 512) to (1456, 512) to ensure video compatibility with most codecs and players. To prevent resizing, make your input image divisible by the macro_block_size or set the macro_block_size to 1 (risking incompatibility).
+100%|██████████████████████████████████████| 58/58 [00:00<00:00, 536.01it/s]
+ 40%|████████████████                        | 4/10 [00:28<00:41,  6.86s/it]2026-02-10 17:44:33,254 Video created: videos/ddppo_pretrained_eval_tdm_long10/episode=41_1-ckpt=0-distance_to_goal=0.15-success=1.00-spl=1.00-distance_to_goal_reward=-0.00.mp4
+                                                                           [2026-02-10 17:44:33,254][imageio_ffmpeg][WARNING] - IMAGEIO FFMPEG_WRITER WARNING: input image is not divisible by macro_block_size=16, resizing from (1455, 512) to (1456, 512) to ensure video compatibility with most codecs and players. To prevent resizing, make your input image divisible by the macro_block_size or set the macro_block_size to 1 (risking incompatibility).
+100%|██████████████████████████████████████| 52/52 [00:00<00:00, 452.39it/s]
+ 50%|████████████████████                    | 5/10 [00:35<00:34,  6.95s/it]2026-02-10 17:44:40,354 Video created: videos/ddppo_pretrained_eval_tdm_long10/episode=16_1-ckpt=0-distance_to_goal=0.06-success=1.00-spl=0.96-distance_to_goal_reward=-0.00.mp4
+                                                                           [2026-02-10 17:44:40,355][imageio_ffmpeg][WARNING] - IMAGEIO FFMPEG_WRITER WARNING: input image is not divisible by macro_block_size=16, resizing from (1455, 512) to (1456, 512) to ensure video compatibility with most codecs and players. To prevent resizing, make your input image divisible by the macro_block_size or set the macro_block_size to 1 (risking incompatibility).
+100%|██████████████████████████████████████| 65/65 [00:00<00:00, 574.36it/s]
+ 60%|████████████████████████                | 6/10 [00:43<00:28,  7.07s/it]2026-02-10 17:44:47,669 Video created: videos/ddppo_pretrained_eval_tdm_long10/episode=2_1-ckpt=0-distance_to_goal=0.14-success=1.00-spl=0.90-distance_to_goal_reward=-0.00.mp4
+                                                                           [2026-02-10 17:44:47,669][imageio_ffmpeg][WARNING] - IMAGEIO FFMPEG_WRITER WARNING: input image is not divisible by macro_block_size=16, resizing from (1455, 512) to (1456, 512) to ensure video compatibility with most codecs and players. To prevent resizing, make your input image divisible by the macro_block_size or set the macro_block_size to 1 (risking incompatibility).
+100%|██████████████████████████████████████| 67/67 [00:00<00:00, 581.51it/s]
+ 70%|████████████████████████████            | 7/10 [00:50<00:21,  7.19s/it]2026-02-10 17:44:55,116 Video created: videos/ddppo_pretrained_eval_tdm_long10/episode=31_1-ckpt=0-distance_to_goal=0.16-success=1.00-spl=1.00-distance_to_goal_reward=-0.00.mp4
+                                                                           [2026-02-10 17:44:55,116][imageio_ffmpeg][WARNING] - IMAGEIO FFMPEG_WRITER WARNING: input image is not divisible by macro_block_size=16, resizing from (1455, 512) to (1456, 512) to ensure video compatibility with most codecs and players. To prevent resizing, make your input image divisible by the macro_block_size or set the macro_block_size to 1 (risking incompatibility).
+100%|██████████████████████████████████████| 66/66 [00:00<00:00, 599.77it/s]
+ 80%|████████████████████████████████        | 8/10 [00:57<00:14,  7.20s/it]2026-02-10 17:45:02,342 Video created: videos/ddppo_pretrained_eval_tdm_long10/episode=17_1-ckpt=0-distance_to_goal=0.05-success=1.00-spl=0.95-distance_to_goal_reward=-0.00.mp4
+                                                                           [2026-02-10 17:45:02,343][imageio_ffmpeg][WARNING] - IMAGEIO FFMPEG_WRITER WARNING: input image is not divisible by macro_block_size=16, resizing from (1455, 512) to (1456, 512) to ensure video compatibility with most codecs and players. To prevent resizing, make your input image divisible by the macro_block_size or set the macro_block_size to 1 (risking incompatibility).
+100%|██████████████████████████████████████| 67/67 [00:00<00:00, 624.93it/s]
+ 90%|████████████████████████████████████    | 9/10 [01:03<00:06,  6.84s/it]2026-02-10 17:45:08,383 Video created: videos/ddppo_pretrained_eval_tdm_long10/episode=43_1-ckpt=0-distance_to_goal=0.02-success=1.00-spl=1.00-distance_to_goal_reward=-0.00.mp4
+                                                                           [2026-02-10 17:45:08,383][imageio_ffmpeg][WARNING] - IMAGEIO FFMPEG_WRITER WARNING: input image is not divisible by macro_block_size=16, resizing from (1455, 512) to (1456, 512) to ensure video compatibility with most codecs and players. To prevent resizing, make your input image divisible by the macro_block_size or set the macro_block_size to 1 (risking incompatibility).
+100%|██████████████████████████████████████| 53/53 [00:00<00:00, 605.02it/s]
+100%|███████████████████████████████████████| 10/10 [01:11<00:00,  7.11s/it]2026-02-10 17:45:16,112 Video created: videos/ddppo_pretrained_eval_tdm_long10/episode=35_1-ckpt=0-distance_to_goal=0.11-success=1.00-spl=0.97-distance_to_goal_reward=-0.00.mp4
+                                                                           [2026-02-10 17:45:16,113][imageio_ffmpeg][WARNING] - IMAGEIO FFMPEG_WRITER WARNING: input image is not divisible by macro_block_size=16, resizing from (1455, 512) to (1456, 512) to ensure video compatibility with most codecs and players. To prevent resizing, make your input image divisible by the macro_block_size or set the macro_block_size to 1 (risking incompatibility).
+100%|██████████████████████████████████████| 72/72 [00:00<00:00, 624.69it/s]
+100%|███████████████████████████████████████| 10/10 [01:11<00:00,  7.19s/it]
+2026-02-10 17:45:16,562 Average episode reward: 13.9786
+2026-02-10 17:45:16,563 Average episode distance_to_goal_reward: 0.0000
+2026-02-10 17:45:16,563 Average episode spl: 0.9726
+2026-02-10 17:45:16,563 Average episode distance_to_goal: 0.0972
+2026-02-10 17:45:16,563 Average episode success: 1.0000
+(habitat) liuyi@liuyi:~/projects/habitat-lab$ 
+
