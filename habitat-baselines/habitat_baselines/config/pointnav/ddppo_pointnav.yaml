@@ -5,16 +5,23 @@ defaults:
   - /habitat_baselines: habitat_baselines_rl_config_base
   - _self_
 
+hydra:
+  job:
+    name: "pointnav_ddppo"
+  run:
+    dir: "runs/hydra/${hydra.job.name}/${now:%Y-%m-%d_%H-%M-%S}"
+
 habitat_baselines:
   verbose: False
   trainer_name: "ddppo"
   torch_gpu_id: 0
-  tensorboard_dir: "tb"
-  video_dir: "video_dir"
+  tensorboard_dir: "${hydra:runtime.output_dir}/tb"
+  video_dir: "${hydra:runtime.output_dir}/videos"
   test_episode_count: -1
-  eval_ckpt_path_dir: "data/new_checkpoints"
+  eval_ckpt_path_dir: "${hydra:runtime.output_dir}/checkpoints"
   num_environments: 4
-  checkpoint_folder: "data/new_checkpoints"
+  checkpoint_folder: "${hydra:runtime.output_dir}/checkpoints"
+  log_file: "${hydra:runtime.output_dir}/train.log"
   num_updates: -1
   total_num_steps: 2.5e9
   log_interval: 10

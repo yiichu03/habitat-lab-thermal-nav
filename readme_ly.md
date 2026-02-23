@@ -1,5 +1,5 @@
 # Habitat + DDPPO 学习手册（个人版）
-
+conda activate habitat
 ## 目标
 - 在 Habitat 里先跑通 `DDPPO baseline` 的训练与评估。
 - 用可复现命令导出视频，确认策略行为。
@@ -29,7 +29,11 @@ wget -c \
 ### 2) 下载/补齐数据与场景（统一到 DATA_ROOT）
 ```bash
 cd ~/projects/habitat-lab
-export DATA_ROOT=/home/liuyi/datasets/habitat
+# 本机：把数据放进仓库的 data/（避免多处路径混用）
+export DATA_ROOT=$(pwd)/data
+
+# 远程服务器：通常放在共享盘（示例）
+# export DATA_ROOT=/data/habitat
 
 # Rearrange 相关：examples/example.py / interactive_play.py 会用到
 python -m habitat_sim.utils.datasets_download \
@@ -67,16 +71,15 @@ python -m habitat_sim.utils.datasets_download \
 ## 你必须记住的关键点
 
 ### 0) 先统一数据根目录（最容易忘）
-- 你的历史问题核心是：`data/` 里混用了两套来源。
-- 一套是软链到 `/home/liuyi/datasets/habitat/*`，另一套是直接下到仓库内 `data/versioned_data/*`。
-- 这会触发：`FileExistsError` / `IsADirectoryError` / `Requested ... not downloaded locally`。
-- 推荐固定使用：`DATA_ROOT=/home/liuyi/datasets/habitat`。
+- 你的历史问题核心是：数据曾经分散在“仓库 `data/`”和“外部 `$DATA_ROOT`”两套路径里。
+- 2026-02-23 已把 `/home/liuyi/datasets/habitat` 下现有数据复制进仓库 `data/`，并把 `data/datasets` 等外部软链替换为本地目录/仓库内相对软链。
+- 本机推荐以仓库 `data/` 作为唯一数据根目录；如果要用下载器，`DATA_ROOT=$(pwd)/data` 即可。
 - 每次开新终端先做：
 ```bash
 cd ~/projects/habitat-lab
 conda activate habitat
 export TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1
-export DATA_ROOT=/home/liuyi/datasets/habitat
+export DATA_ROOT=$(pwd)/data
 ```
 
 ### 1) 预训练权重和观测必须匹配
@@ -86,9 +89,8 @@ export DATA_ROOT=/home/liuyi/datasets/habitat
   - `habitat.gym.obs_keys=[depth,pointgoal_with_gps_compass]`
 
 ### 2) `data/` 目录是软链接混合结构
-- 你的 `data/datasets`、`data/scene_datasets` 等有软链接到 `/home/liuyi/datasets/habitat/...`。
-- 下载器报错（`FileExistsError` / `IsADirectoryError`）很多是因为目标路径已经存在且类型（目录/链接）不一致。
-- 结论：后续统一用同一个 `DATA_ROOT`，不要反复混用 `/data`、仓库内 `data/versioned_data` 和其他绝对路径。
+- 目前仓库 `data/` 里只保留“指向仓库内 `data/versioned_data` 的相对软链接”，不再指向 `/home/liuyi/datasets/habitat`。
+- 历史外部软链已备份在 `data/_external_links_backup/`（仅用于回滚，不参与正常运行）。
 
 ### 3) `interactive_play.py` 的 GLX 报错
 - 报 `X_GLXMakeCurrent BadAccess` 属于图形上下文/显示环境问题，不是 DDPPO 主流程错误。
@@ -158,8 +160,10 @@ python -u -m habitat_baselines.run \
   habitat_baselines.video_dir=videos/ddppo_pretrained_eval
 ```
 
-### D. 高级可视化（第三视角 + top-down map）
+### D. 高级可视化（第三视角 + top-down map）#################################
 ```bash
+TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1 python -u -m habitat_baselines.run --config-name=pointnav/ddppo_pointnav_pretrained_tdm.yaml benchmark/nav/pointnav=pointnav_habitat_test
+
 python -u -m habitat_baselines.run \
   --config-name=pointnav/ddppo_pointnav_pretrained_tdm.yaml \
   benchmark/nav/pointnav=pointnav_habitat_test
@@ -270,9 +274,35 @@ python -u -m habitat_baselines.run \
   - `habitat-baselines/habitat_baselines/rl/ddppo/ddp_utils.py`：分布式初始化、rank0 保存/恢复、同步工具（多 GPU/多进程才重点）
   - `habitat-baselines/habitat_baselines/rl/ddppo/policy/resnet_policy.py`：DDPPO baseline 常用的 PointNav policy 网络（encoder/RNN/heads）
 
+### 0.1) `habitat_baselines/rl/ppo` vs `habitat_baselines/rl/ddppo`（目录职责怎么理解）
+- **`rl/ppo/` 更像“通用 RL 框架层”**：rollout、PPO 更新、评估循环、视频导出都在这里，既服务 `trainer_name=ppo` 也服务 `trainer_name=ddppo`。
+  - 关键文件：
+    - `habitat-baselines/habitat_baselines/rl/ppo/ppo_trainer.py`：训练/评估主循环（注意 `@register_trainer(name="ddppo")` 也挂在这个类上）
+    - `habitat-baselines/habitat_baselines/rl/ppo/ppo.py`：PPO loss 与优化器更新（算法核心）
+    - `habitat-baselines/habitat_baselines/rl/ppo/single_agent_access_mgr.py`：组装 policy/updater，并负责加载 `ddppo.pretrained*` 权重
+    - `habitat-baselines/habitat_baselines/rl/ppo/habitat_evaluator.py`：评估 loop（env.step -> action -> metrics/video）
+- **`rl/ddppo/` 更像“PPO 的分布式实现 + DDPPO baseline 的模型库”**：把“分布式同步/工具 + 常用 policy 网络（ResNet）”单独放在这里。
+  - 分布式部分（你用多 GPU/多进程时才是重点）：
+    - `habitat-baselines/habitat_baselines/rl/ddppo/algo/ddppo.py`：`class DDPPO(..., PPO)`，在 PPO 基础上加分布式/去中心化同步逻辑
+    - `habitat-baselines/habitat_baselines/rl/ddppo/ddp_utils.py`：rank/world 初始化、广播、保存/恢复 resume state 等
+  - 模型/网络部分（即使单机也常用）：
+    - `habitat-baselines/habitat_baselines/rl/ddppo/policy/resnet.py`：ResNet backbone 定义（供 policy encoder 用）
+    - `habitat-baselines/habitat_baselines/rl/ddppo/policy/resnet_policy.py`：PointNavResNetPolicy / encoder / RNN / heads（你改 encoder 通常从这里入手）
+    - `habitat-baselines/habitat_baselines/rl/ddppo/policy/running_mean_and_var.py`：输入归一化统计（预训练权重/视觉输入常用）
+- **为什么“DDPPO 文件夹里也有 resnet/resnet_policy”**：因为 Habitat Baselines 的历史实现里，“DDPPO baseline 最常用的 PointNav 网络结构”就是 ResNet+RNN，这套网络被复用到了 PPO 和 DDPPO 两种 trainer 上，所以网络文件不在 `rl/ppo/` 也很正常。
+- **一个实用记法**：
+  - 想懂 “PPO 更新怎么做”：先看 `habitat-baselines/habitat_baselines/rl/ppo/ppo.py`
+  - 想懂 “rollout 怎么收集 + 何时 update + 怎么保存 ckpt”：看 `habitat-baselines/habitat_baselines/rl/ppo/ppo_trainer.py`
+  - 想改 “视觉 encoder / 融合 / RNN 输入”：看 `habitat-baselines/habitat_baselines/rl/ddppo/policy/resnet_policy.py`
+  - 想跑 “多 GPU/多机 DDPPO”：看 `habitat-baselines/habitat_baselines/rl/ddppo/algo/ddppo.py` + `habitat-baselines/habitat_baselines/rl/ddppo/ddp_utils.py`
+
 ### 1) 从入口到梯度更新（训练主链路）
 - 实验入口（Hydra + train/eval 分支）  
   `habitat-baselines/habitat_baselines/run.py`
+  - `@hydra.main(config_path="config")`：`--config-name=pointnav/ddppo_pointnav.yaml` 会去 `habitat-baselines/habitat_baselines/config/pointnav/ddppo_pointnav.yaml` 找配置
+  - `patch_config(cfg)`：主要做 Habitat config 的一致性修补（比如单智能体时补全 `habitat.simulator.agents_order`）
+  - `execute_exp(cfg, ...)`：通过 `habitat_baselines.evaluate` 决定走 `trainer.train()` 还是 `trainer.eval()`
+  - `baseline_registry.get_trainer(habitat_baselines.trainer_name)`：按字符串找 trainer 构造函数（例如 `trainer_name=ddppo` 也会构造 `PPOTrainer`，因为它被注册成了 `ddppo` trainer）
 - Trainer 主循环（rollout 收集、更新、存 ckpt）  
   `habitat-baselines/habitat_baselines/rl/ppo/ppo_trainer.py`
   - rollout：`_compute_actions_and_step_envs()` / `_collect_environment_result()`
@@ -284,11 +314,72 @@ python -u -m habitat_baselines.run \
 - PPO 算法实现（loss、entropy、value、梯度裁剪、优化器）  
   `habitat-baselines/habitat_baselines/rl/ppo/ppo.py`
 
+### 1.1) Baseline DDPPO 训练时 reward 是怎么来的？
+- **reward 不是在 baselines 里“手写”出来的**，而是 Habitat-Lab 的 `RLEnv` 负责定义 reward；baselines 只是拿到 `env.step()` 返回的 reward 存进 rollout buffer。
+- 对 PointNav/Navigation 来说，关键配置都在 `habitat-lab/habitat/config/habitat/task/pointnav.yaml`：
+  - `reward_measure: "distance_to_goal_reward"`
+  - `slack_reward` / `success_reward`（在训练/benchmark 配置里通常会覆盖默认值）
+  - `success_measure: "spl"`（用于判定“episode 是否成功”，成功时额外加 `success_reward`）
+  - `end_on_success: True`（成功后可以提前 done）
+- **reward 的组合逻辑**在 `habitat-lab/habitat/core/environments.py`：
+  - `RLTaskEnv.get_reward()`：`reward = slack_reward + metrics[reward_measure] + (success ? success_reward : 0)`
+  - `RLTaskEnv.get_done()`：episode_over 或（end_on_success 且 success）即 done
+- **`distance_to_goal_reward` 的数学定义**在 `habitat-lab/habitat/tasks/nav/nav.py`：
+  - `DistanceToGoalReward`：`reward = -(new_distance - previous_distance)`（即“距离减少”为正奖励）
+- **`success_measure="spl"` 为什么也能当 success**：`spl` 在 `habitat-lab/habitat/tasks/nav/nav.py` 里是 `SPL` measure（依赖 `Success`），失败时为 0，成功时在 (0,1]，所以在 `if spl:` 的判断里等价于 “是否成功”。
+
+### 1.2) DDPPO 是怎么计算 loss/目标函数并更新参数的？
+- **DDPPO 的 loss 本质就是 PPO loss**，核心实现都在 `habitat-baselines/habitat_baselines/rl/ppo/ppo.py`（`class PPO`）。
+- 训练时“从 reward 到 optimizer.step”的调用链（建议你按这个顺序读）：
+  1) rollout 收集（env.step 返回 reward）：`habitat-baselines/habitat_baselines/rl/ppo/ppo_trainer.py`  
+     `_collect_rollout_step()` -> `_compute_actions_and_step_envs()` / `_collect_environment_result()`
+  2) 计算 returns/GAE：`habitat-baselines/habitat_baselines/rl/ppo/ppo_trainer.py:_update_agent()`  
+     `rollouts.compute_returns(next_value, use_gae, gamma, tau)`（实现见 `habitat-baselines/habitat_baselines/common/rollout_storage.py:compute_returns`）
+  3) PPO 更新：`habitat-baselines/habitat_baselines/rl/ppo/ppo.py:update()`  
+     生成 minibatch -> `_update_from_batch(...)` -> `total_loss.backward()` -> `clip_grad_norm_` -> `optimizer.step()`
+- **PPO 的总 loss 组成**（都能在 `habitat-baselines/habitat_baselines/rl/ppo/ppo.py:_update_from_batch()` 对上号）：
+  - `ratio = exp(new_logp - old_logp)`
+  - `action_loss = -min(adv * ratio, adv * clamp(ratio, 1-eps, 1+eps))`
+  - `value_loss = 0.5 * mse(V(s), returns)`（可选 value clipping）
+  - `entropy bonus`：`-entropy_coef * dist_entropy`（鼓励探索）
+  - `aux losses`：如果你配置了 `habitat_baselines.rl.auxiliary_losses.*`，会 `all_losses.extend(...)` 加到 `total_loss`
+  - `total_loss = value_loss_coef * value_loss + action_loss - entropy_coef * entropy + aux`
+- **DDPPO 和 PPO 的区别点在哪里**（不改 loss，只改“如何分布式算它”）：
+  - `habitat-baselines/habitat_baselines/rl/ddppo/algo/ddppo.py`：`class DDPPO(DecentralizedDistributedMixin, PPO)`  
+    主要是把 `evaluate_actions` 包一层 `DistributedDataParallel`，并把 `advantages` 的 var/mean 统计做成 distributed 版本（`distributed_var_mean`）。
+
 ### 2) Baseline 模型结构（你要改 encoder 的位置）
 - PointNav policy（ResNet encoder + RNN + actor/critic heads）  
   `habitat-baselines/habitat_baselines/rl/ddppo/policy/resnet_policy.py`
   - `ResNetEncoder`：视觉编码器入口（改 backbone/输入通道/融合都在这里落地）
   - `PointNavResNetNet.forward()`：把 visual + goal 传感器特征拼接后送入 RNN
+
+### 2.1) 我怎么确认 “模型输入/输出” 到底是什么（推理视角）
+- **模型输入来自 env observation（由 config 决定）**，核心入口在：
+  - `habitat-lab/habitat/gym/gym_wrapper.py`：`HabGymWrapper` 会按 `habitat.gym.obs_keys` 过滤 observation keys
+    - `obs_keys=None` 时默认包含 env 提供的所有 observation keys
+    - 这就是为什么“同一套 policy 代码”有时吃 RGBD，有时只吃 depth: 取决于 `obs_keys` 和 sim_sensors 是否开启
+  - `habitat-baselines/habitat_baselines/rl/ddppo/policy/resnet_policy.py`：`ResNetEncoder.visual_keys` 会把所有“图像类输入（shape>1）”找出来，然后把它们在 channel 维 concat
+    - 如果 observation 里同时有 `rgb(H,W,3)` + `depth(H,W,1)`，那 encoder 的输入通道数就是 4（RGBD）
+    - 如果你只保留 `depth(H,W,1)`，那输入通道数就是 1（depth-only）
+- **PointNav 默认的 “GPS+Compass” 在哪**：
+  - 配置启用传感器：`habitat-lab/habitat/config/habitat/task/pointnav.yaml` 里默认启用 `pointgoal_with_gps_compass_sensor`
+  - 传感器实现代码：`habitat-lab/habitat/tasks/nav/nav.py` 的 `IntegratedPointGoalGPSAndCompassSensor`（uuid=`pointgoal_with_gps_compass`）
+    - 它不是直接把 `(gps, compass)` 两个 raw 传感器值拼给你，而是用 episode goal + agent state 在线计算 “pointgoal” 观测
+    - 如果你同时在 task 里启用 `GPSSensor`/`CompassSensor`，policy 里也有对应 embedding（见 `PointNavResNetNet` 对 `EpisodicGPSSensor`/`EpisodicCompassSensor` 的分支）
+- **模型输出是什么（离散/连续）**：
+  - 输出动作张量在 `habitat-baselines/habitat_baselines/rl/ppo/policy.py`：`NetPolicy.act()` 返回 `PolicyActionData.actions`
+  - `action_distribution_type` 决定离散/连续：
+    - 默认 `PolicyConfig.action_distribution_type="categorical"`（离散动作 id），由 `habitat-baselines/habitat_baselines/config/default_structured_configs.py` 定义
+    - 如果设成 `gaussian` 才是连续动作（mean/std），同一个 `act()` 会输出连续向量
+  - 对 PointNav 任务来说，默认动作集合在 `habitat-lab/habitat/config/habitat/task/pointnav.yaml`：
+    - `stop` / `move_forward` / `turn_left` / `turn_right`
+    - 因此 “离散动作 id” 本质是在这个 action set 上做分类
+- **项目里有没有“加载权重的推理代码”**：有，两条主路径（你现在已经用过）
+  - `python -m habitat_baselines.run habitat_baselines.evaluate=True ...`：走 `PPOTrainer._eval_checkpoint()`（`habitat-baselines/habitat_baselines/rl/ppo/ppo_trainer.py`）
+  - 权重加载位置：
+    - 加载 RL ckpt：`PPOTrainer._eval_checkpoint()` -> `self.load_checkpoint(...)` -> `self._agent.load_state_dict(...)`
+    - 加载 DDPPO 预训练 encoder：`SingleAgentAccessMgr._create_policy()`（`habitat-baselines/habitat_baselines/rl/ppo/single_agent_access_mgr.py`）里读 `habitat_baselines.rl.ddppo.pretrained*`
 
 ### 3) 辅助监督头/辅助 loss（你要“加辅助头”的正确挂载点）
 - auxiliary loss 框架（NetPolicy 会收集 `aux_loss_state` 并调用 aux modules）  
@@ -331,3 +422,181 @@ python -u -m habitat_baselines.run \
   `habitat-baselines/habitat_baselines/utils/common.py`（`CategoricalNet` / `GaussianNet`）
 - Habitat action config（Navigation/Rearrrange 的连续 action 配置不同）  
   `habitat-lab/habitat/config/default_structured_configs.py`（例如 `VelocityControlActionConfig` / `BaseVelocityActionConfig`）
+
+## 本机数据盘点（2026-02-23）
+
+> 说明：
+> - 空间占用来自 `du -sh`（会受文件系统 block size 影响，属于近似值）。
+> - `data/` 内存在少量“仓库内相对软链接”（例如 `data/scene_datasets/habitat-test-scenes -> ../versioned_data/habitat_test_scenes`），`du` 看到的 `0` 只是链接本身大小。
+> - 本节只统计 Habitat 相关数据/权重/产物，不包含 conda env、pip cache 等。
+
+### 1) 仓库目录：`/home/liuyi/projects/habitat-lab`
+
+- 压缩包/历史文件
+  - `habitat-test-scenes.zip`：91M
+- 训练/评估产物（仓库根目录）
+  - `videos/`：11M
+  - `tb/`：9.7M
+  - `outputs/`：752K
+- `data/`（仓库内数据根目录）总计：2.7G
+  - 预训练权重
+    - `data/ddppo-models/`：48M（`gibson-2plus-resnet50.pth`）
+  - 训练/评估产物（checkpoint）
+    - `data/new_checkpoints/`：290M（`ckpt.*.pth` + `latest.pth` + `.habitat-resume-state*.pth`）
+    - `data/new_checkpoints_ddppo_demo/`：848M（你的 demo 训练产物）
+  - 数据集（episodes）
+    - `data/datasets/`：386M（含 `pointnav/gibson`）
+  - 场景/资源（versioned_data）
+    - `data/versioned_data/`：1.2G（`habitat_test_*` + `replica_cad_dataset` + `ycb` + `hab_fetch` + `rearrange_*`）
+  - 自定义数据
+    - `data/custom_datasets/`：20K（`val_long10.json.gz`）
+  - 旧外部软链备份（不参与运行）
+    - `data/_external_links_backup/`：8K
+
+树结构（简化）：
+```text
+/home/liuyi/projects/habitat-lab
+|-- habitat-test-scenes.zip (91M)
+|-- data (2.7G)
+|   |-- datasets (386M)
+|   |-- scene_datasets (dir + internal symlinks)
+|   |-- objects (dir + internal symlinks)
+|   |-- robots (dir + internal symlinks)
+|   |-- replica_cad -> versioned_data/replica_cad_dataset
+|   |-- new_checkpoints (290M)
+|   |-- ddppo-models (48M)
+|   |-- new_checkpoints_ddppo_demo (848M)
+|   |-- versioned_data (1.2G)
+|   |-- custom_datasets (20K)
+|   `-- _external_links_backup (8K)
+|-- videos (11M)
+|-- tb (9.7M)
+`-- outputs (752K)
+```
+
+### 2) 旧数据根目录（未删除）：`/home/liuyi/datasets/habitat`（2.0G）
+
+该目录已不再被仓库内 `data/` 依赖（仅作为迁移前数据来源保留）。确认你本地运行无误后，可以再讨论是否删除以释放空间。
+
+### 3) 迁移状态（总结）
+
+- 仓库 `data/` 现在是本机唯一数据根目录；`data/` 内不再指向 `/home/liuyi/datasets/habitat`。
+- `/home/liuyi/datasets/habitat` 仍存在（冗余副本）；后续如果你确认不再依赖，可以删除。
+
+## 数据整理建议（按你当前“本地全放 data/”的规则）
+
+1) 本机 canonical root：仓库内 `data/`（仅放静态数据：scene assets / datasets / pretrained weights）。  
+2) 训练与评估产物统一放 `runs/<task>/<exp>/<timestamp>/...`（不再写入 `data/`）。  
+3) 远程服务器 canonical root：建议放到共享盘（示例 `/data/habitat`），每个 repo 的 `data/` 软链到共享盘路径，避免多份拷贝。  
+4) 需要 rearrange demo 时再补齐 `example_objects`（当前不创建坏链接，避免踩坑）。  
+5) 确认无回滚需求后，可删除 `/home/liuyi/datasets/habitat` 冗余副本与 `data/_external_links_backup/`。
+
+## 运行产物重整（2026-02-23）
+
+为避免 `data/` 与运行输出混放，已完成重整：
+
+- 历史运行产物已迁移到 `runs/legacy/`：
+  - `runs/legacy/checkpoints/new_checkpoints`
+  - `runs/legacy/checkpoints/new_checkpoints_ddppo_demo`
+  - `runs/legacy/hydra_outputs/all_outputs`
+  - `runs/legacy/tensorboard/tb`
+  - `runs/legacy/videos/videos`
+  - `runs/legacy/logs/train.log`
+- 过渡软链接已删除，不再保留（避免目录混乱）：
+  - `outputs` / `tb` / `videos` / `train.log`
+  - `data/new_checkpoints` / `data/new_checkpoints_ddppo_demo` / `data/videos`
+
+后续新实验统一写入 `runs/...`，不再默认写入仓库根目录或 `data/`。
+
+## 双目轨迹录制脚本（2026-02-23）
+
+脚本路径：`examples/pointnav_stereo_rollout_recorder.py`
+
+### 1) 脚本用途
+
+- 从 PointNav episodes 中取样并 `reset`。
+- 用 `ShortestPathFollower` 生成近似最短路动作序列并执行 rollout。
+- 每一步保存一张 `left|right` side-by-side PNG。
+- 每个 episode 结束后额外保存一张 topdown 地图+轨迹图（`topdown_trajectory.png`）。
+- 同步写 `metadata.jsonl`（step、action、goal、agent pose）。
+- 该脚本独立运行，不改训练/评估主链路。
+
+### 2) 实现逻辑（当前版本）
+
+- 左目使用主 agent 的 `rgb_sensor`；右目运行时注入 `ThirdRGBSensorConfig`。
+- 两目分辨率与 `hfov` 相同，`hfov` 由 `fx` 和 `width` 反算：
+  - `hfov = 2 * atan(width / (2 * fx))`
+  - 注意：当前 Habitat 结构化配置里 `hfov` 字段是 `int`，脚本会对反算出的浮点 `hfov` 做 `round` 后写入，并打印等效 `fx` 与误差百分比。
+- 基线按对称方式放置在原相机中心两侧：
+  - left: `center - sign * baseline / 2`
+  - right: `center + sign * baseline / 2`
+- `right-x-sign` 用于切换左右在 x 轴上的方向定义（便于快速检查视差方向）。
+- 脚本会自动启用 `top_down_map` measurement（若配置里未开启），并在 rollout 过程中更新 topdown 轨迹图。
+- rollout 在以下条件之一停止：
+  - episode 结束
+  - follower 返回 `stop/None`
+  - 达到 `max_steps`
+
+### 3) 主要参数说明
+
+- `--config-path`：PointNav 配置，默认 `benchmark/nav/pointnav/pointnav_habitat_test.yaml`
+- `--overrides`：可选 Habitat config 覆盖项
+- `--output-dir`：输出目录，默认 `runs/stereo_debug_rollouts`
+- `--num-episodes`：录制 episode 数量，默认 `5`
+- `--max-steps`：每条 episode 最多步数，默认 `200`
+- `--width --height`：图像分辨率，默认 `640x512`
+- `--fx`：用于反算 `hfov` 的焦距（像素），默认 `302.53882`
+- `--baseline-meters`：双目基线（米），默认 `0.12165`
+- `--right-x-sign`：右目 x 轴方向，`1` 或 `-1`，默认 `1`
+- `--left-obs-key`：左目观测键名，默认 `rgb`
+- `--right-obs-key`：右目观测键名，默认 `right_rgb`
+- `--seed`：随机种子，默认 `0`
+
+### 4) 推荐运行命令（最新）
+
+```bash
+cd ~/projects/habitat-lab
+conda activate habitat
+export DATA_ROOT=$(pwd)/data
+python -u examples/pointnav_stereo_rollout_recorder.py \
+  --config-path benchmark/nav/pointnav/pointnav_habitat_test.yaml \
+  --num-episodes 5 \
+  --max-steps 80 \
+  --output-dir runs/stereo_debug_rollouts/habitat_test \
+  --width 640 --height 512 \
+  --fx 302.53882 \
+  --baseline-meters 0.12165 \
+  --right-x-sign 1
+```
+
+Gibson 版本：
+
+```bash
+python -u examples/pointnav_stereo_rollout_recorder.py \
+  --config-path benchmark/nav/pointnav/pointnav_gibson.yaml \
+  --num-episodes 5 \
+  --max-steps 80 \
+  --output-dir runs/stereo_debug_rollouts/gibson \
+  --width 640 --height 512 \
+  --fx 302.53882 \
+  --baseline-meters 0.12165 \
+  --right-x-sign 1
+```
+
+### 5) 输出结构
+
+- `runs/stereo_debug_rollouts/<split>/ep_xxx_<scene>_<episode_id>/frame_00000.png`
+- `runs/stereo_debug_rollouts/<split>/ep_xxx_<scene>_<episode_id>/metadata.jsonl`
+- `runs/stereo_debug_rollouts/<split>/ep_xxx_<scene>_<episode_id>/topdown_trajectory.png`
+绿线：shortest path（从起点到目标的最短路参考线）
+代码在 nav.py (line 832) 到 nav.py (line 836)，颜色常量是绿色 MAP_SHORTEST_PATH_COLOR，定义在 maps.py (line 50)。
+
+蓝线：通常是 agent 实际走过轨迹的“早期颜色段”
+轨迹在 nav.py (line 904) 到 nav.py (line 915) 用随步数变化的 colormap 画，开始偏蓝，后面会逐渐变绿/黄/红。
+另外起点本身也是蓝色标记，定义在 maps.py (line 48)。
+
+### 6) 常见检查项
+
+- 如果视差方向和预期相反：改 `--right-x-sign -1` 重跑。
+- 如果左右图键名不一致：显式指定 `--left-obs-key` 与 `--right-obs-key`。
+- 如果没有生成 topdown 图：检查配置是否是导航任务并确认 episode 至少执行了一步。
