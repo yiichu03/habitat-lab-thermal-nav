@@ -5,9 +5,9 @@ on:
     branches:
     - main
     tags: [ "v*" ]
-  schedule:
-    - cron: "0 5 * * *"
-    #this is 9PM PST
+  # schedule:
+  #   - cron: "0 5 * * *"
+  #   #this is 9PM PST
 
 jobs:
   pre-commit:
